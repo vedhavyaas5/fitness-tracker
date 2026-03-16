@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+{% block title %}Admin · Fitness Tracker{% endblock %}
+{% block content %}
+  <h1>Admin Dashboard</h1>
+
+  <section class="card">
+    <h2>All Users</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Goal</th>
+          <th>Activity</th>
+          <th>Today Consumed</th>
+          <th>Today Burned</th>
+          <th>Wt/Ht</th>
+          <th>Update Goal/Activity</th>
+          <th>Suggest</th>
+          <th>Schedule</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in summaries %}
+        <tr>
+          <td><strong>{{ u.username }}</strong></td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.goal or '-' }}</td>
+          <td>{{ u.activity_level or '-' }}</td>
+          <td>{{ '%.0f'|format(u.consumed or 0) }} kcal</td>
+          <td>{{ '%.0f'|format(u.burned or 0) }} kcal</td>
+          <td>{% if u.weight %}{{ u.weight }} kg{% else %}-{% endif %}{% if u.height %} / {{ u.height }} cm{% endif %}</td>
+          <td>
+            <form method="post" action="/admin/user/update" class="form" style="gap:.5rem;">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <select name="goal">
+                <option value="bulk" {% if u.goal=='bulk' %}selected{% endif %}>Bulk</option>
+                <option value="cut" {% if u.goal=='cut' %}selected{% endif %}>Cut</option>
+              </select>
+              <select name="activity_level">
+                <option value="sedentary" {% if u.activity_level=='sedentary' %}selected{% endif %}>Sedentary</option>
+                <option value="lightly_active" {% if u.activity_level=='lightly_active' %}selected{% endif %}>Lightly Active</option>
+                <option value="moderately_active" {% if u.activity_level=='moderately_active' %}selected{% endif %}>Moderately Active</option>
+                <option value="very_active" {% if u.activity_level=='very_active' %}selected{% endif %}>Very Active</option>
+                <option value="extra_active" {% if u.activity_level=='extra_active' %}selected{% endif %}>Extra Active</option>
+              </select>
+              <button type="submit">Save</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="/admin/suggest" class="form" style="gap:.5rem;">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <input type="text" name="text" placeholder="Workout/Diet suggestion" required>
+              <button type="submit">Send</button>
+            </form>
+          </td>
+          <td>
+            <button type="button" onclick="showWorkoutAssignment('{{ u.id }}', '{{ u.username }}')" style="width:100%;padding:.5rem;">Assign Workout</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Workout Assignment Modal -->
+  <div id="workout-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div style="position:relative; margin:2rem auto; max-width:700px; background:white; padding:2rem; border-radius:8px; max-height:90vh; overflow-y:auto;">
+      <h2>Assign Workout Plan</h2>
+      <p id="modal-user-label" style="margin-bottom:1rem; font-weight:bold;"></p>
+      
+      <form method="post" action="/admin/assign-workout" id="workout-form">
+        <input type="hidden" name="user_id" id="modal-user-id">
+        
+        <label>Date
+          <input name="date" type="date" value="{{ today }}" required>
+        </label>
+
+        <label>Workout Plan Name
+          <input type="text" name="plan_name" placeholder="e.g., Push Day, Leg Day" required>
+        </label>
+        
+        <h3>Add Exercises</h3>
+        <div id="exercises-container"></div>
+        
+        <button type="button" onclick="addExerciseRow()" style="margin-bottom:1rem;">+ Add Exercise</button>
+        
+        <label>Additional Notes (optional)
+          <textarea name="notes" rows="3" placeholder="Instructions, intensity, rest periods, etc."></textarea>
+        </label>
+        
+        <div style="display:flex; gap:1rem; margin-top:1rem;">
+          <button type="submit">Assign Workout</button>
+          <button type="button" onclick="closeWorkoutModal()" style="background:#666;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Exercise catalog (same as log_workout.html)
+    const CATALOG = [
+      // Chest
+      {name:'Barbell Bench Press', cat:'Chest', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Incline Barbell Bench Press', cat:'Chest', sets:3, reps:'10', kcalSet:23},
+      {name:'Decline Barbell Bench Press', cat:'Chest', sets:3, reps:'10', kcalSet:22},
+      {name:'Flat Dumbbell Press', cat:'Chest', sets:4, reps:'10', kcalSet:24},
+      {name:'Incline Dumbbell Press', cat:'Chest', sets:3, reps:'10-12', kcalSet:23},
+      {name:'Dumbbell Fly (Flat)', cat:'Chest', sets:3, reps:'12', kcalSet:20},
+      {name:'Incline Dumbbell Fly', cat:'Chest', sets:3, reps:'12', kcalSet:21},
+      {name:'Machine Chest Press', cat:'Chest', sets:3, reps:'10', kcalSet:19},
+      {name:'Seated Pec Deck Fly', cat:'Chest', sets:3, reps:'12', kcalSet:18},
+      {name:'Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:12},
+      {name:'Wide-Grip Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:13},
+      {name:'Decline Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:14},
+      {name:'Incline Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:12},
+      {name:'Diamond Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:14},
+      {name:'Chest Dips', cat:'Chest', sets:3, reps:'12', kcalSet:15},
+      // Shoulders
+      {name:'Overhead Barbell Press', cat:'Shoulders', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Dumbbell Shoulder Press', cat:'Shoulders', sets:4, reps:'10', kcalSet:24},
+      {name:'Arnold Press', cat:'Shoulders', sets:3, reps:'10', kcalSet:23},
+      {name:'Lateral Dumbbell Raise', cat:'Shoulders', sets:3, reps:'12-15', kcalSet:19},
+      {name:'Rear Delt Dumbbell Fly', cat:'Shoulders', sets:3, reps:'12-15', kcalSet:20},
+      {name:'Upright Row (Barbell)', cat:'Shoulders', sets:3, reps:'10', kcalSet:22},
+      // Biceps
+      {name:'Barbell Curl', cat:'Biceps', sets:4, reps:'8-10', kcalSet:20},
+      {name:'Dumbbell Bicep Curl', cat:'Biceps', sets:4, reps:'10', kcalSet:18},
+      {name:'Hammer Curl', cat:'Biceps', sets:3, reps:'10-12', kcalSet:18},
+      {name:'Preacher Curl (EZ Bar)', cat:'Biceps', sets:3, reps:'10', kcalSet:17},
+      // Triceps
+      {name:'Close-Grip Barbell Bench Press', cat:'Triceps', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Tricep Dips', cat:'Triceps', sets:4, reps:'10-12', kcalSet:22},
+      {name:'Skull Crushers (EZ Bar)', cat:'Triceps', sets:3, reps:'10-12', kcalSet:20},
+      {name:'Cable Rope Tricep Pushdown', cat:'Triceps', sets:3, reps:'12', kcalSet:18},
+      // Back
+      {name:'Deadlift (Barbell)', cat:'Back', sets:4, reps:'6-8', kcalSet:40},
+      {name:'Bent-Over Barbell Row', cat:'Back', sets:4, reps:'8-10', kcalSet:30},
+      {name:'Pull-Ups / Chin-Ups', cat:'Back', sets:4, reps:'8-12', kcalSet:25},
+      {name:'Lat Pulldown (Cable)', cat:'Back', sets:3, reps:'12', kcalSet:22},
+      // Legs
+      {name:'Barbell Back Squat', cat:'Legs', sets:4, reps:'8-10', kcalSet:35},
+      {name:'Romanian Deadlift', cat:'Legs', sets:4, reps:'8-10', kcalSet:33},
+      {name:'Leg Press', cat:'Legs', sets:4, reps:'10-12', kcalSet:30},
+      {name:'Walking Lunges (Dumbbells)', cat:'Legs', sets:3, reps:'12/leg', kcalSet:25},
+      // Glutes
+      {name:'Barbell Hip Thrust', cat:'Glutes', sets:4, reps:'10-12', kcalSet:30},
+      {name:'Glute Bridge (Barbell)', cat:'Glutes', sets:3, reps:'12-15', kcalSet:25},
+      // Forearms
+      {name:'Barbell Wrist Curl', cat:'Forearms', sets:3, reps:'12-15', kcalSet:15},
+      {name:'Reverse Barbell Wrist Curl', cat:'Forearms', sets:3, reps:'12-15', kcalSet:15},
+      // Abs
+      {name:'Crunches', cat:'Abs', sets:3, reps:'15-20', kcalSet:15},
+      {name:'Plank (60 sec)', cat:'Abs', sets:3, reps:'60s', kcalSet:12},
+      {name:'Hanging Leg Raise', cat:'Abs', sets:3, reps:'12-15', kcalSet:18},
+      // Calves
+      {name:'Standing Calf Raise', cat:'Calves', sets:4, reps:'15-20', kcalSet:20},
+      {name:'Seated Calf Raise', cat:'Calves', sets:4, reps:'15-20', kcalSet:18},
+      // Cardio
+      {name:'Running (moderate)', cat:'Cardio', sets:1, reps:'min', kcalSet:10, per:'min'},
+      {name:'Cycling (moderate)', cat:'Cardio', sets:1, reps:'min', kcalSet:8, per:'min'},
+      {name:'Jump Rope', cat:'Cardio', sets:1, reps:'min', kcalSet:12, per:'min'}
+    ];
+
+    let exerciseRowCounter = 0;
+
+    function showWorkoutAssignment(userId, username) {
+      document.getElementById('modal-user-id').value = userId;
+      document.getElementById('modal-user-label').textContent = 'Assigning workout to: ' + username;
+      document.getElementById('exercises-container').innerHTML = '';
+      exerciseRowCounter = 0;
+      addExerciseRow();
+      document.getElementById('workout-modal').style.display = 'block';
+    }
+
+    function closeWorkoutModal() {
+      document.getElementById('workout-modal').style.display = 'none';
+    }
+
+    function addExerciseRow() {
+      const container = document.getElementById('exercises-container');
+      const rowId = exerciseRowCounter++;
+      
+      const row = document.createElement('div');
+      row.style.cssText = 'border:1px solid #ddd; padding:1rem; margin-bottom:1rem; border-radius:4px; position:relative;';
+      row.id = 'exercise-row-' + rowId;
+      
+      row.innerHTML = `
+        <button type="button" onclick="removeExerciseRow(${rowId})" style="position:absolute; top:0.5rem; right:0.5rem; background:#f44; color:white; border:none; border-radius:4px; padding:0.25rem 0.5rem; cursor:pointer;">×</button>
+        
+        <label style="display:block; margin-bottom:0.5rem;">Category
+          <select class="ex-category" onchange="filterExercises(${rowId})" style="width:100%; padding:0.5rem;">
+            <option value="all">All</option>
+            <option>Chest</option>
+            <option>Shoulders</option>
+            <option>Biceps</option>
+            <option>Triceps</option>
+            <option>Back</option>
+            <option>Legs</option>
+            <option>Glutes</option>
+            <option>Forearms</option>
+            <option>Abs</option>
+            <option>Calves</option>
+            <option>Cardio</option>
+          </select>
+        </label>
+        
+        <label style="display:block; margin-bottom:0.5rem;">Exercise
+          <select name="exercises[]" class="ex-select" required onchange="updateDefaults(${rowId})" style="width:100%; padding:0.5rem;">
+            <option value="">-- Choose an exercise --</option>
+          </select>
+        </label>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+          <label>Sets
+            <input type="number" name="sets[]" class="ex-sets" min="1" step="1" value="3" required style="width:100%; padding:0.5rem;">
+          </label>
+          <label>Reps
+            <input type="text" name="reps[]" class="ex-reps" value="10" required style="width:100%; padding:0.5rem;">
+          </label>
+        </div>
+      `;
+      
+      container.appendChild(row);
+      filterExercises(rowId);
+    }
+
+    function removeExerciseRow(rowId) {
+      const row = document.getElementById('exercise-row-' + rowId);
+      if (row) row.remove();
+    }
+
+    function filterExercises(rowId) {
+      const row = document.getElementById('exercise-row-' + rowId);
+      if (!row) return;
+      
+      const catSelect = row.querySelector('.ex-category');
+      const exSelect = row.querySelector('.ex-select');
+      const category = catSelect.value;
+      
+      const prevValue = exSelect.value;
+      exSelect.innerHTML = '<option value="">-- Choose an exercise --</option>';
+      
+      const filtered = category === 'all' 
+        ? CATALOG 
+        : CATALOG.filter(x => x.cat === category);
+      
+      filtered.forEach(ex => {
+        const opt = document.createElement('option');
+        opt.value = ex.name;
+        opt.textContent = `${ex.name} · ${ex.cat}`;
+        exSelect.appendChild(opt);
+      });
+      
+      if (prevValue) exSelect.value = prevValue;
+    }
+
+    function updateDefaults(rowId) {
+      const row = document.getElementById('exercise-row-' + rowId);
+      if (!row) return;
+      
+      const exSelect = row.querySelector('.ex-select');
+      const setsInput = row.querySelector('.ex-sets');
+      const repsInput = row.querySelector('.ex-reps');
+      
+      const exercise = CATALOG.find(x => x.name === exSelect.value);
+      if (exercise) {
+        setsInput.value = exercise.sets;
+        repsInput.value = exercise.reps;
+      }
+    }
+
+    // Close modal when clicking outside
+    document.getElementById('workout-modal')?.addEventListener('click', function(e) {
+      if (e.target === this) closeWorkoutModal();
+    });
+  </script>
+{% endblock %}

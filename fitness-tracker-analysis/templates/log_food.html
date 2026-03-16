@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Log Food · Fitness Tracker{% endblock %}
+{% block content %}
+  <h1>🍽️ Log Your Food</h1>
+  
+  <section class="grid-2">
+    <div class="card">
+      <h2>Add Food Entry</h2>
+      <form method="post" action="/food/add" class="form">
+        <label>Date
+          <input name="date" type="date" value="{{ today }}" required>
+        </label>
+        
+        <label>Search Food
+          <input type="text" id="food-search" placeholder="Type to search... (e.g., rice, dosa, chicken)" autocomplete="off">
+        </label>
+
+        <label>Select Food *
+          <select name="food_id" id="food-select" required>
+            <option value="">-- Choose a food --</option>
+          </select>
+        </label>
+        
+        <label>Quantity *
+          <input name="quantity" type="number" step="0.1" min="0.1" placeholder="e.g., 1, 2.5, 100" required value="1">
+        </label>
+        
+        <label>Notes (optional)
+          <textarea name="notes" placeholder="e.g., grilled, with butter, homemade" rows="3"></textarea>
+        </label>
+        
+        <button type="submit" style="background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); font-size: 1.1rem; padding: 1rem;">Log Food</button>
+      </form>
+    </div>
+    
+    <div class="card">
+      <h2>Today's Summary</h2>
+      <div style="background: #f0f4f8; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+        <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #666;">Maintenance Calories</p>
+        <p style="margin: 0.5rem 0; font-size: 2rem; font-weight: bold; color: #0d9488;" id="maintenance-display">{{ maintenance_calories|default('N/A', true) }} kcal</p>
+      </div>
+      
+      <div style="background: #ccfbf1; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+        <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #0f766e;">Total Consumed Today</p>
+        <p style="margin: 0.5rem 0; font-size: 2rem; font-weight: bold; color: #0d9488;" id="total-consumed">0 kcal</p>
+      </div>
+      
+      <div style="background: #fef3c7; padding: 1.5rem; border-radius: 8px;">
+        <p style="margin: 0.5rem 0; font-size: 0.9rem; color: #92400e;">Remaining</p>
+        <p style="margin: 0.5rem 0; font-size: 2rem; font-weight: bold; color: #b45309;" id="remaining">{{ maintenance_calories|default('N/A', true) }} kcal</p>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Today's Food Log -->
+  <section class="card">
+    <h2>Today's Food Log</h2>
+    <div id="food-log-container" style="margin-top: 1rem;">
+      <p style="text-align: center; color: #999;">Loading food log...</p>
+    </div>
+  </section>
+
+  <script>
+    const maintenanceCalories = {{ maintenance_calories|default(2000, true) }};
+    const todayDate = new Date().toISOString().split('T')[0];
+    
+    // Foods cache and renderer
+    let ALL_FOODS = [];
+    function renderFoodOptions(query = '') {
+      const select = document.getElementById('food-select');
+      const q = (query || '').toLowerCase().trim();
+      // Preserve current selection
+      const prev = select.value;
+      // Clear and repopulate
+      select.innerHTML = '<option value="">-- Choose a food --</option>';
+      const filtered = q
+        ? ALL_FOODS.filter(f => f.name.toLowerCase().includes(q))
+        : ALL_FOODS;
+      filtered.slice(0, 150).forEach(food => {
+        const option = document.createElement('option');
+        option.value = food.id;
+        option.textContent = `${food.name} (${food.calories_per_unit} kcal/${food.unit})`;
+        select.appendChild(option);
+      });
+      // Restore selection if still present
+      if (prev) select.value = prev;
+    }
+
+    // Load foods on page load
+    async function loadFoods() {
+      try {
+        const response = await fetch('/api/foods');
+        ALL_FOODS = await response.json();
+        renderFoodOptions('');
+        // Wire up search box
+        const search = document.getElementById('food-search');
+        if (search) {
+          search.addEventListener('input', (e) => {
+            renderFoodOptions(e.target.value);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading foods:', error);
+      }
+    }
+    
+    // Load today's food log
+    async function loadFoodLog() {
+      const today = todayDate;
+      try {
+        const response = await fetch(`/api/food-entries?date=${today}`);
+        const foodEntries = await response.json();
+        
+        const container = document.getElementById('food-log-container');
+        
+        if (foodEntries.length === 0) {
+          container.innerHTML = '<p style="text-align: center; color: #999;">No food entries for today</p>';
+          updateSummary(0);
+          return;
+        }
+        
+        let totalCalories = 0;
+        let html = '<table class="table" style="width: 100%;"><thead><tr><th>Food</th><th>Qty</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th><th>Notes</th><th>Action</th></tr></thead><tbody>';
+        
+        foodEntries.forEach(entry => {
+          totalCalories += entry.calories_consumed;
+          html += `<tr>
+            <td>${entry.food_name}</td>
+            <td>${entry.quantity} ${entry.unit}</td>
+            <td><strong>${entry.calories_consumed.toFixed(0)}</strong> kcal</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>${entry.notes || '-'}</td>
+            <td>
+              <button class="delete-food-btn" data-entry-id="${entry.entry_id}" style="background-color: #dc3545; color: white; padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 4px; border: none; cursor: pointer;">Delete</button>
+            </td>
+          </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        html += `<p style="text-align: right; margin-top: 1rem; font-size: 1.1rem; font-weight: bold; color: #0d9488;">Total: ${totalCalories.toFixed(0)} kcal</p>`;
+        
+        container.innerHTML = html;
+        updateSummary(totalCalories);
+        
+        // Add event listeners to delete buttons
+        document.querySelectorAll('.delete-food-btn').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            const entryId = this.getAttribute('data-entry-id');
+            if (!confirm('Delete this food entry?')) return;
+            
+            try {
+              const response = await fetch(`/api/food-entries/${entryId}`, {
+                method: 'DELETE'
+              });
+              const result = await response.json();
+              if (result.ok) {
+                loadFoodLog();
+              } else {
+                alert('Error deleting food entry: ' + result.error);
+              }
+            } catch (error) {
+              console.error('Error deleting food entry:', error);
+              alert('Error deleting food entry');
+            }
+          });
+        });
+      } catch (error) {
+        console.error('Error loading food log:', error);
+      }
+    }
+    
+    function updateSummary(consumed) {
+      const remaining = Math.max(0, maintenanceCalories - consumed);
+      document.getElementById('total-consumed').textContent = consumed.toFixed(0) + ' kcal';
+      document.getElementById('remaining').textContent = remaining.toFixed(0) + ' kcal';
+      
+      if (consumed > maintenanceCalories * 1.2) {
+        document.getElementById('remaining').style.color = '#dc3545';
+      } else if (consumed > maintenanceCalories) {
+        document.getElementById('remaining').style.color = '#fd7e14';
+      } else {
+        document.getElementById('remaining').style.color = '#28a745';
+      }
+    }
+    
+    
+    // Initialize on page load
+    window.addEventListener('load', function() {
+      loadFoods();
+      loadFoodLog();
+      
+      // Refresh food log every 10 seconds
+      setInterval(loadFoodLog, 10000);
+    });
+  </script>
+{% endblock %}

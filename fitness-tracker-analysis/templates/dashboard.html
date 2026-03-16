@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard · Fitness Tracker{% endblock %}
+{% block content %}
+  <h1>Dashboard</h1>
+
+  <style>
+    /* Radial styles embedded to ensure loading */
+    .radial-wrap{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+    .radial-progress{position:relative;width:clamp(160px,28vw,260px);aspect-ratio:1/1}
+    .radial-svg{width:100%;height:100%;transform:rotate(-90deg)}
+    .radial-track{fill:none;stroke:#E2E8F0;stroke-opacity:.5;stroke-width:10}
+    .radial-bar{fill:none;stroke:var(--secondary,#14B8A6);stroke-width:10;stroke-linecap:round;stroke-dasharray:339.292;stroke-dashoffset:339.292;transition:stroke-dashoffset .8s ease,stroke .3s ease}
+    .radial-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+    .radial-number{font-size:clamp(26px,5.2vw,40px);font-weight:800;color:#1E293B;line-height:1}
+    .radial-caption{font-size:11px;color:#64748b;margin-top:4px}
+    .radial-remaining{color:#0D9488;font-weight:600;margin-top:.35rem}
+    .stats3{text-align:center;margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+    .stat-title{font-size:.9rem;color:#64748b;margin-bottom:.25rem}
+    .stat-value{font-size:1.5rem;font-weight:700}
+  </style>
+
+  <!-- Calorie Radial Progress -->
+  <section class="card">
+    <h2>Daily Calorie Tracking</h2>
+    <div class="radial-wrap">
+      <div class="radial-progress" id="calorieRadial" data-goal="{{ maintenance_calories|default(2000, true) }}" data-value="{{ calories_consumed_today|default(0, true) }}">
+        <svg viewBox="0 0 120 120" class="radial-svg">
+          <circle class="radial-track" cx="60" cy="60" r="54"></circle>
+          <circle class="radial-bar" cx="60" cy="60" r="54"></circle>
+        </svg>
+        <div class="radial-center">
+          <div class="radial-number" id="radialNumber">0</div>
+          <div class="radial-caption">kcal</div>
+        </div>
+      </div>
+      <div class="radial-remaining" id="radialRemaining"></div>
+    </div>
+    <div class="stats3">
+      <div>
+        <p class="stat-title">Maintenance Calories</p>
+        <p class="stat-value text-primary"><span id="maintenanceCalories">{{ maintenance_calories|default('N/A', true) }}</span> kcal</p>
+      </div>
+      <div>
+        <p class="stat-title">Calories Consumed Today</p>
+        <p class="stat-value" style="color: var(--secondary);"><span id="caloriesConsumed">{{ calories_consumed_today|default(0, true) }}</span> kcal</p>
+      </div>
+      <div>
+        <p class="stat-title">Calories Burned Today</p>
+        <p class="stat-value text-accent"><span id="caloriesBurned">{{ calories_burned_today|default(0, true) }}</span> kcal</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Trainer Suggestions</h2>
+      <ul id="suggestions-list" style="list-style: none; padding-left: 0;">
+        <li style="color:#64748b;">Loading...</li>
+      </ul>
+    </div>
+    <div class="card" style="text-align: center;">
+      <h2>🧍 Add Body Entry</h2>
+      <p style="color: #666; margin-bottom: 1.5rem;">Record weight, height and more</p>
+      <a href="/body/log" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2); transition: all 0.3s;">Go to Body Logger</a>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h2>🏋️ Log Workout</h2>
+      <p style="color: #666; margin-bottom: 1.5rem;">Select an exercise and auto-calc calories burned</p>
+      <a href="/workout/log" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2); transition: all 0.3s;">Go to Workout Logger</a>
+    </div>
+
+    <div class="card" style="text-align: center;">
+      <h2>🍽️ Log Your Food</h2>
+      <p style="color: #666; margin-bottom: 1.5rem;">Track what you eat and monitor your daily calorie intake</p>
+      <a href="/food/log" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2); transition: all 0.3s;">Go to Food Logger</a>
+    </div>
+  </section>
+
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Scheduled Workouts</h2>
+      <ul id="schedules-list" style="list-style: none; padding-left: 0;">
+        <li style="color:#64748b;">Loading...</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Recent Workouts</h2>
+      <table class="table" id="workout-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Type</th><th>Duration</th><th>Calories</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for w in recent_workouts %}
+          <tr>
+            <td>{{ w[0] }}</td>
+            <td>{{ w[1] }}</td>
+            <td>{{ w[2] }}</td>
+            <td>{{ w[3] }}</td>
+            <td>{{ w[4] }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <script>
+    // Radial progress (SVG) — no external libs
+    const maintenanceCalories = {{ maintenance_calories|default(2000, true) }};
+    const caloriesConsumed = {{ calories_consumed_today|default(0, true) }};
+    const css = getComputedStyle(document.documentElement);
+    const secondary = (css.getPropertyValue('--secondary') || '#14B8A6').trim();
+
+    const radial = document.getElementById('calorieRadial');
+    if (radial) {
+      const goal = Number(radial.getAttribute('data-goal')) || maintenanceCalories || 1;
+      const value = Number(radial.getAttribute('data-value')) || 0;
+      const percent = Math.max(0, Math.min(100, (value / goal) * 100));
+
+      const radius = 54;
+      const circumference = 2 * Math.PI * radius;
+      const bar = radial.querySelector('.radial-bar');
+      bar.style.strokeDasharray = `${circumference} ${circumference}`;
+      bar.style.strokeDashoffset = `${circumference}`;
+      bar.style.stroke = value > goal ? '#ef4444' : secondary;
+
+      requestAnimationFrame(() => {
+        const offset = circumference * (1 - percent / 100);
+        bar.style.strokeDashoffset = `${offset}`;
+      });
+
+      document.getElementById('radialNumber').textContent = value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      document.getElementById('radialRemaining').textContent = `Remaining: ${Math.max(0, goal - value).toLocaleString()} kcal`;
+    }
+
+    // Load trainer suggestions
+    const suggestionsList = document.getElementById('suggestions-list');
+    if (suggestionsList) {
+      fetch('/suggestions')
+        .then(r => r.json())
+        .then(data => {
+          suggestionsList.innerHTML = '';
+          const suggestions = data.suggestions || [];
+          if (suggestions.length === 0) {
+            suggestionsList.innerHTML = '<li style="color:#94a3b8; padding: 0.5rem 0;">No suggestions yet. Check back later!</li>';
+          } else {
+            suggestions.forEach(s => {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding: 0.75rem 1rem; margin-bottom: 0.5rem; background: rgba(13, 148, 136, 0.05); border-left: 3px solid #0d9488; border-radius: 4px; color: #1e293b;';
+              li.textContent = s;
+              suggestionsList.appendChild(li);
+            });
+          }
+        })
+        .catch(() => {
+          suggestionsList.innerHTML = '<li style="color:#ef4444; padding: 0.5rem 0;">Failed to load suggestions</li>';
+        });
+    }
+
+    // Load scheduled workouts
+    const schedulesList = document.getElementById('schedules-list');
+    if (schedulesList) {
+      fetch('/schedules')
+        .then(r => r.json())
+        .then(data => {
+          schedulesList.innerHTML = '';
+          const schedules = data.schedules || [];
+          if (schedules.length === 0) {
+            schedulesList.innerHTML = '<li style="color:#94a3b8; padding: 0.5rem 0;">No scheduled workouts yet</li>';
+          } else {
+            schedules.forEach(s => {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding: 1rem; margin-bottom: 0.75rem; background: white; border: 2px solid #0d9488; border-radius: 8px;';
+              li.innerHTML = `
+                <div style="font-weight: 700; color: #0d9488; margin-bottom: 0.5rem; font-size: 1.1rem;">${s.title}</div>
+                <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem;">📅 ${s.date}</div>
+                ${s.notes ? `<div style="white-space: pre-line; color: #1e293b; background: rgba(13, 148, 136, 0.05); padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem; font-size: 0.95rem;">${s.notes}</div>` : ''}
+              `;
+              schedulesList.appendChild(li);
+            });
+          }
+        })
+        .catch(() => {
+          schedulesList.innerHTML = '<li style="color:#ef4444; padding: 0.5rem 0;">Failed to load schedules</li>';
+        });
+    }
+  </script>
+{% endblock %}

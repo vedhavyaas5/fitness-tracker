@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Log Body · Fitness Tracker{% endblock %}
+{% block content %}
+  <h1>🧍 Log Body Entry</h1>
+  <section class="card">
+    <form method="post" action="/body" class="form">
+      <label>Date
+        <input name="date" type="date" value="{{ today }}">
+      </label>
+      <label>Weight (kg)
+        <input name="weight_kg" type="number" step="0.1" required>
+      </label>
+      <label>Height (cm)
+        <input name="height_cm" type="number" step="0.1" required>
+      </label>
+      <label>Body Fat (%)
+        <input name="bodyfat_pct" type="number" step="0.1">
+      </label>
+      <label>Water (L)
+        <input name="water_l" type="number" step="0.1">
+      </label>
+      <label>Notes
+        <input name="notes" type="text">
+      </label>
+      <button type="submit">Save Body Entry</button>
+    </form>
+  </section>
+{% endblock %}

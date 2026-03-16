@@ -1,0 +1,8 @@
+Flask
+Flask-Login
+requests
+beautifulsoup4
+pandas
+numpy
+matplotlib
+plotly

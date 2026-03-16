@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block title %}Log Workout · Fitness Tracker{% endblock %}
+{% block content %}
+  <h1>🏋️ Log Your Workout</h1>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Add Workout Entry</h2>
+      <form method="post" action="/workout" class="form" id="workout-form">
+        <label>Date
+          <input name="date" type="date" value="{{ today }}" required>
+        </label>
+
+        <div class="grid-2">
+          <label>Search Exercise
+            <input type="text" id="wo-search" placeholder="Type to search... (e.g., bench, squat, curl)" autocomplete="off">
+          </label>
+          <label>Category
+            <select id="wo-category">
+              <option value="all">All</option>
+              <option>Chest</option>
+              <option>Shoulders</option>
+              <option>Biceps</option>
+              <option>Triceps</option>
+              <option>Back</option>
+              <option>Legs</option>
+              <option>Glutes</option>
+              <option>Forearms</option>
+              <option>Abs</option>
+              <option>Calves</option>
+              <option>Cardio</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Select Exercise *
+          <select name="workout_type" id="wo-select" required>
+            <option value="">-- Choose an exercise --</option>
+          </select>
+        </label>
+
+        <div class="grid-2">
+          <label>Sets
+            <input type="number" id="wo-sets" name="sets" min="1" step="1" value="3" required>
+          </label>
+          <label>Reps (each set)
+            <input type="text" id="wo-reps" name="reps" placeholder="e.g., 10 or 8-10" value="10">
+          </label>
+        </div>
+
+        <label>Weight Used (kg)
+          <input type="number" id="wo-weight" name="weight_kg" min="0" step="0.5" placeholder="e.g., 40">
+        </label>
+
+        <div class="grid-2">
+          <label>Calories per set (auto)
+            <input type="number" id="wo-kcal-set" value="0" readonly>
+          </label>
+          <label>Total Calories Burned (auto)
+            <input type="number" id="wo-kcal-total" value="0" readonly>
+          </label>
+        </div>
+
+        <input type="hidden" name="duration_min" value="0">
+        <input type="hidden" name="calories_burned" id="wo-calories-burned" value="0">
+
+        <label>Notes (optional)
+          <textarea name="notes" rows="3" placeholder="e.g., RPE 8, supersets, tempo"></textarea>
+        </label>
+
+        <button type="submit">Log Workout</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>How it works</h2>
+      <p>Select an exercise, adjust sets/reps if needed. Calories are computed as sets × calories-per-set from the catalog. Cardio can be logged from the Cardio category; minutes-based items multiply kcal/min × minutes if provided.</p>
+    </div>
+  </section>
+
+  <script>
+    // Minimal catalog built-in. You can extend this list.
+    const CATALOG = [
+      // Chest
+      {name:'Barbell Bench Press', cat:'Chest', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Incline Barbell Bench Press', cat:'Chest', sets:3, reps:'10', kcalSet:23},
+      {name:'Decline Barbell Bench Press', cat:'Chest', sets:3, reps:'10', kcalSet:22},
+      {name:'Flat Dumbbell Press', cat:'Chest', sets:4, reps:'10', kcalSet:24},
+      {name:'Incline Dumbbell Press', cat:'Chest', sets:3, reps:'10-12', kcalSet:23},
+      {name:'Dumbbell Fly (Flat)', cat:'Chest', sets:3, reps:'12', kcalSet:20},
+      {name:'Incline Dumbbell Fly', cat:'Chest', sets:3, reps:'12', kcalSet:21},
+      {name:'Machine Chest Press', cat:'Chest', sets:3, reps:'10', kcalSet:19},
+      {name:'Seated Pec Deck Fly', cat:'Chest', sets:3, reps:'12', kcalSet:18},
+      {name:'Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:12},
+      {name:'Wide-Grip Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:13},
+      {name:'Decline Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:14},
+      {name:'Incline Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:12},
+      {name:'Diamond Push-Up', cat:'Chest', sets:3, reps:'15', kcalSet:14},
+      {name:'Chest Dips', cat:'Chest', sets:3, reps:'12', kcalSet:15},
+      // Shoulders
+      {name:'Overhead Barbell Press', cat:'Shoulders', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Dumbbell Shoulder Press', cat:'Shoulders', sets:4, reps:'10', kcalSet:24},
+      {name:'Arnold Press', cat:'Shoulders', sets:3, reps:'10', kcalSet:23},
+      {name:'Lateral Dumbbell Raise', cat:'Shoulders', sets:3, reps:'12-15', kcalSet:19},
+      {name:'Rear Delt Dumbbell Fly', cat:'Shoulders', sets:3, reps:'12-15', kcalSet:20},
+      {name:'Upright Row (Barbell)', cat:'Shoulders', sets:3, reps:'10', kcalSet:22},
+      // Biceps
+      {name:'Barbell Curl', cat:'Biceps', sets:4, reps:'8-10', kcalSet:20},
+      {name:'Dumbbell Bicep Curl', cat:'Biceps', sets:4, reps:'10', kcalSet:18},
+      {name:'Hammer Curl', cat:'Biceps', sets:3, reps:'10-12', kcalSet:18},
+      {name:'Preacher Curl (EZ Bar)', cat:'Biceps', sets:3, reps:'10', kcalSet:17},
+      // Triceps
+      {name:'Close-Grip Barbell Bench Press', cat:'Triceps', sets:4, reps:'8-10', kcalSet:25},
+      {name:'Tricep Dips', cat:'Triceps', sets:4, reps:'10-12', kcalSet:22},
+      {name:'Skull Crushers (EZ Bar)', cat:'Triceps', sets:3, reps:'10-12', kcalSet:20},
+      {name:'Cable Rope Tricep Pushdown', cat:'Triceps', sets:3, reps:'12', kcalSet:18},
+      // Back
+      {name:'Deadlift (Barbell)', cat:'Back', sets:4, reps:'6-8', kcalSet:40},
+      {name:'Bent-Over Barbell Row', cat:'Back', sets:4, reps:'8-10', kcalSet:30},
+      {name:'Pull-Ups / Chin-Ups', cat:'Back', sets:4, reps:'8-12', kcalSet:25},
+      {name:'Lat Pulldown (Cable)', cat:'Back', sets:3, reps:'12', kcalSet:22},
+      // Legs
+      {name:'Barbell Back Squat', cat:'Legs', sets:4, reps:'8-10', kcalSet:35},
+      {name:'Romanian Deadlift', cat:'Legs', sets:4, reps:'8-10', kcalSet:33},
+      {name:'Leg Press', cat:'Legs', sets:4, reps:'10-12', kcalSet:30},
+      {name:'Walking Lunges (Dumbbells)', cat:'Legs', sets:3, reps:'12/leg', kcalSet:25},
+      // Glutes
+      {name:'Barbell Hip Thrust', cat:'Glutes', sets:4, reps:'10-12', kcalSet:30},
+      {name:'Glute Bridge (Barbell)', cat:'Glutes', sets:3, reps:'12-15', kcalSet:25},
+      // Forearms
+      {name:'Barbell Wrist Curl', cat:'Forearms', sets:3, reps:'12-15', kcalSet:15},
+      {name:'Reverse Barbell Wrist Curl', cat:'Forearms', sets:3, reps:'12-15', kcalSet:15},
+      // Abs
+      {name:'Crunches', cat:'Abs', sets:3, reps:'15-20', kcalSet:15},
+      {name:'Plank (60 sec)', cat:'Abs', sets:3, reps:'60s', kcalSet:12},
+      {name:'Hanging Leg Raise', cat:'Abs', sets:3, reps:'12-15', kcalSet:18},
+      // Calves
+      {name:'Standing Calf Raise', cat:'Calves', sets:4, reps:'15-20', kcalSet:20},
+      {name:'Seated Calf Raise', cat:'Calves', sets:4, reps:'15-20', kcalSet:18},
+      // Cardio (kcal per minute)
+      {name:'Running (moderate)', cat:'Cardio', sets:1, reps:'min', kcalSet:10, per:'min'},
+      {name:'Cycling (moderate)', cat:'Cardio', sets:1, reps:'min', kcalSet:8, per:'min'},
+      {name:'Jump Rope', cat:'Cardio', sets:1, reps:'min', kcalSet:12, per:'min'}
+    ];
+
+    const selectEl = document.getElementById('wo-select');
+    const searchEl = document.getElementById('wo-search');
+    const catEl = document.getElementById('wo-category');
+    const setsEl = document.getElementById('wo-sets');
+    const repsEl = document.getElementById('wo-reps');
+    const kcalSetEl = document.getElementById('wo-kcal-set');
+    const kcalTotalEl = document.getElementById('wo-kcal-total');
+    const kcalHidden = document.getElementById('wo-calories-burned');
+
+    function filteredCatalog() {
+      const q = (searchEl.value||'').toLowerCase();
+      const cat = catEl.value;
+      return CATALOG.filter(x => (cat==='all'||x.cat===cat) && x.name.toLowerCase().includes(q));
+    }
+
+    function renderOptions() {
+      const data = filteredCatalog();
+      const prev = selectEl.value;
+      selectEl.innerHTML = '<option value="">-- Choose an exercise --</option>';
+      data.forEach((x,i)=>{
+        const opt = document.createElement('option');
+        opt.value = x.name;
+        opt.textContent = `${x.name} · ${x.cat}`;
+        selectEl.appendChild(opt);
+      });
+      if (prev) selectEl.value = prev;
+      onExerciseChange();
+    }
+
+    function findSelected() {
+      const name = selectEl.value;
+      return CATALOG.find(x => x.name === name) || null;
+    }
+
+    function onExerciseChange() {
+      const item = findSelected();
+      if (!item) { kcalSetEl.value = 0; kcalTotalEl.value = 0; kcalHidden.value = 0; return; }
+      // default fields
+      if (!setsEl.value) setsEl.value = item.sets;
+      repsEl.value = item.reps;
+      kcalSetEl.value = item.kcalSet;
+      calcTotal();
+    }
+
+    function calcTotal() {
+      const item = findSelected();
+      if (!item) { kcalTotalEl.value = 0; kcalHidden.value = 0; return; }
+      let sets = Number(setsEl.value||item.sets||1);
+      if (item.cat === 'Cardio' || item.per === 'min') {
+        // interpret "sets" as minutes
+        kcalTotalEl.value = Math.round(sets * item.kcalSet);
+      } else {
+        kcalTotalEl.value = Math.round(sets * item.kcalSet);
+      }
+      kcalHidden.value = kcalTotalEl.value;
+    }
+
+    searchEl.addEventListener('input', renderOptions);
+    catEl.addEventListener('change', renderOptions);
+    selectEl.addEventListener('change', onExerciseChange);
+    setsEl.addEventListener('input', calcTotal);
+
+    // Append weight into notes on submit so it is saved without DB changes
+    const form = document.getElementById('workout-form');
+    form.addEventListener('submit', () => {
+      const w = (document.getElementById('wo-weight').value || '').trim();
+      if (w) {
+        const notesEl = form.querySelector('textarea[name="notes"]');
+        const prefix = `Weight: ${w} kg`;
+        notesEl.value = notesEl.value ? `${prefix} — ${notesEl.value}` : prefix;
+      }
+    });
+
+    renderOptions();
+  </script>
+{% endblock %}

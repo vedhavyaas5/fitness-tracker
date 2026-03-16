@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Home · Fitness Tracker{% endblock %}
+{% block content %}
+  <section>
+    <h1>Welcome to Fitness Tracker & Analyzer</h1>
+    <p class="intro">Your personal companion for tracking health metrics, logging workouts, and achieving your fitness goals.</p>
+    
+    <div class="features-container">
+      <h2>What You Can Do</h2>
+      
+      <div class="feature">
+        <h3>📊 Track Health Metrics</h3>
+        <p>Monitor your weight, height, body fat percentage, and water intake. Get automatic BMI calculations and track changes over time.</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🏋️ Log Workouts</h3>
+        <p>Record your workouts with exercise details and calorie information. Keep track of your training progress and intensity.</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🎯 Set Fitness Goals</h3>
+        <p>Define your objectives with two fitness modes: Bulk (build muscle) or Cut (lose fat). Get personalized maintenance calorie calculations based on your age, gender, and activity level.</p>
+      </div>
+      
+      <div class="feature">
+        <h3>📈 Visualize Progress</h3>
+        <p>View real-time charts and progress tracking with an interactive calorie gauge. Analyze your fitness journey with beautiful visualizations.</p>
+      </div>
+      
+      <div class="feature">
+        <h3>🔐 Secure Account</h3>
+        <p>Create your personal account with secure authentication. Keep your fitness data private and accessible only to you.</p>
+      </div>
+    </div>
+    
+    <div class="cta-section">
+      {% if user %}
+        <p>You are logged in as <strong>{{ user.username }}</strong>. Go to your <a href="/dashboard" class="btn-primary">dashboard</a>.</p>
+      {% else %}
+        <p>Ready to start your fitness journey? <a href="/register" class="btn-primary">Register Now</a> or <a href="/login" class="btn-secondary">Log In</a></p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
